@@ -1,12 +1,17 @@
+
 import axios from "axios";
 import { adminPreviewEnabled, setPreviewAccount } from "@/dev/previewSession";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000",
+  baseURL:
+    import.meta.env.VITE_API_URL ||
+    "https://event-sphere-backend-sigma.vercel.app",
   timeout: 15000,
-  ...(import.meta.env.DEV && adminPreviewEnabled && {
-    adapter: async (config) => (await import("@/dev/previewAdapter")).previewAdapter(config),
-  }),
+  ...(import.meta.env.DEV &&
+    adminPreviewEnabled && {
+      adapter: async (config) =>
+        (await import("@/dev/previewAdapter")).previewAdapter(config),
+    }),
   headers: {
     "Content-Type": "application/json",
   },
@@ -17,6 +22,7 @@ export function clearAuth() {
     setPreviewAccount(null);
     return;
   }
+
   const keys = [
     "token",
     "user",
@@ -33,6 +39,7 @@ export function clearAuth() {
 
 export function saveAuth(token, user) {
   if (adminPreviewEnabled) return;
+
   if (!token || !user?._id) {
     throw new Error("Invalid login response");
   }
@@ -48,7 +55,9 @@ export function saveAuth(token, user) {
 }
 
 api.interceptors.request.use((config) => {
-  const token = adminPreviewEnabled ? null : localStorage.getItem("token");
+  const token = adminPreviewEnabled
+    ? null
+    : localStorage.getItem("token");
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -60,7 +69,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const token = adminPreviewEnabled ? null : localStorage.getItem("token");
+    const token = adminPreviewEnabled
+      ? null
+      : localStorage.getItem("token");
+
     const authorization = error.config?.headers?.Authorization;
     const isLogin = error.config?.url === "/auth/login";
 
