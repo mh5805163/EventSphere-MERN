@@ -5,7 +5,7 @@ import { adminPreviewEnabled, setPreviewAccount } from "@/dev/previewSession";
 const api = axios.create({
   baseURL:
     import.meta.env.VITE_API_URL ||
-    "https://event-sphere-backend-sigma.vercel.app",
+    "https://event-sphere-backend-plcmfxceq.vercel.app",
   timeout: 15000,
   ...(import.meta.env.DEV &&
     adminPreviewEnabled && {

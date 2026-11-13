@@ -1,3 +1,4 @@
+
 import EllipsisLoader from "@/components/EllipsisLoader";
 import { useState } from 'react';
 import { adminPreviewEnabled } from '@/dev/previewSession';
@@ -13,6 +14,7 @@ import {
 import { ArrowUpRight } from 'lucide-react';
 import AuthLayout from '@/components/auth/AuthLayout';
 import PasswordField from '@/components/auth/PasswordField';
+
 function accountDestination(account, returnTo) {
   const booking = returnTo && /^\/book\/?(?:[?#]|$)/i.test(returnTo);
   return (booking && account.role !== "attendee" ? null : returnTo) || (account.role === "attendee" ? "/" : "/dashboard");
@@ -27,44 +29,77 @@ export default function Login({ signup = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from;
+
   const returnTo =
-    typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') && !from.includes('\\') && !/login|signup|register/i.test(from) ? from : null;
+    typeof from === 'string' &&
+    from.startsWith('/') &&
+    !from.startsWith('//') &&
+    !from.includes('\\') &&
+    !/login|signup|register/i.test(from)
+      ? from
+      : null;
+
   if (user) return <Navigate to={accountDestination(user, returnTo)} replace />;
+
   async function submit(event) {
     event.preventDefault();
+
     if (loading) return;
+
     setError('');
+
     const values = Object.fromEntries(new FormData(event.currentTarget));
+
     if (signup && values.password !== values.confirmPassword) {
       setError('Your passwords do not match. Please check both fields.');
       return;
     }
+
     if (signup && new TextEncoder().encode(values.password).length > 72) {
       setError(
         'Your password is too long. Use at most 72 bytes; some characters use more than one.',
       );
       return;
     }
+
     delete values.confirmPassword;
+
     try {
       setLoading(true);
       values.email = values.email.trim().toLowerCase();
+
       if (import.meta.env.DEV && adminPreviewEnabled && !signup) {
         const { signInToPreview } = await import('@/dev/previewLogin');
         const account = signInToPreview(values);
         navigate(accountDestination(account, returnTo), { replace: true });
         return;
       }
-      const { data } = await API.post(signup ? '/auth/register' : '/auth/login', values);
+
+      const { data } = await API.post(
+        signup ? '/auth/register' : '/auth/login',
+        values
+      );
+
       const account = signup ? data.data : data.existingUser;
-      saveAuth(data.token, account);
-      navigate(accountDestination(account, returnTo), { replace: true });
+
+      if (signup) {
+        navigate("/login", { replace: true });
+      } else {
+        saveAuth(data.token, account);
+        navigate(accountDestination(account, returnTo), { replace: true });
+      }
+
     } catch (failure) {
-      setError(failure.response?.data?.msg || failure.message || 'Unable to connect to the server');
+      setError(
+        failure.response?.data?.msg ||
+        failure.message ||
+        'Unable to connect to the server'
+      );
     } finally {
       setLoading(false);
     }
   }
+
   return (
     <AuthLayout
       title={signup ? 'Create an account' : 'Welcome back'}
@@ -92,6 +127,7 @@ export default function Login({ signup = false }) {
                 placeholder="Your full name"
               />
             </div>
+
             <div className="grid min-w-0 gap-1">
               <label htmlFor="role">I'm joining as</label>
               <select
@@ -105,12 +141,14 @@ export default function Login({ signup = false }) {
                 <option value="attendee">Attendee</option>
                 <option value="exhibitor">Exhibitor</option>
               </select>
+
               <p id="role-help" className="text-xs leading-5">
                 Organizer accounts are managed by an administrator.
               </p>
             </div>
           </>
         )}
+
         <div className="grid min-w-0 gap-1">
           <label htmlFor="email">Email address</label>
           <input
@@ -122,10 +160,16 @@ export default function Login({ signup = false }) {
             placeholder="you@example.com"
           />
         </div>
+
         <PasswordField newPassword={signup} />
+
         {signup ? (
           <>
-            <PasswordField id="confirmPassword" label="Confirm password" newPassword />
+            <PasswordField
+              id="confirmPassword"
+              label="Confirm password"
+              newPassword
+            />
             <p className="text-xs leading-5">
               Use 8–72 characters (maximum 72 bytes).
             </p>
@@ -138,6 +182,7 @@ export default function Login({ signup = false }) {
             Forgot password?
           </Link>
         )}
+
         {error && (
           <p
             className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-800"
@@ -146,13 +191,17 @@ export default function Login({ signup = false }) {
             {error}
           </p>
         )}
+
         <button
           className="celebration-auth-submit inline-flex w-full items-center justify-center gap-3 px-5 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60"
           disabled={loading}
         >
           {loading ? (
             <>
-              <EllipsisLoader scope="inline" label={signup ? "Creating your account" : "Signing in"} />
+              <EllipsisLoader
+                scope="inline"
+                label={signup ? "Creating your account" : "Signing in"}
+              />
               Please wait…
             </>
           ) : (
@@ -163,6 +212,7 @@ export default function Login({ signup = false }) {
           )}
         </button>
       </form>
+
       <p className="mt-4 text-center text-sm leading-6 [&_a]:font-semibold">
         {signup ? 'Already part of EventSphere?' : 'New to EventSphere?'}{' '}
         <Link to={signup ? '/login' : '/signup'} state={{ from: returnTo }}>
