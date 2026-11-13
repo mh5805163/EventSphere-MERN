@@ -29,13 +29,24 @@ const app = express();
 
 app.disable("x-powered-by");
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "https://event-sphere-mern-hrt5.vercel.app",
+  "http://localhost:5173"
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "*"
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true
 }));
 
 app.use(express.json({ limit: "100kb" }));
 
-// Initialize MongoDB and required models
 let initializationPromise;
 
 async function initializeBackend() {
@@ -58,7 +69,6 @@ async function initializeBackend() {
   return initializationPromise;
 }
 
-// Health check: confirms the function is running
 app.get("/health", (req, res) => {
   res.status(200).json({
     success: true,
@@ -66,7 +76,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Initialize database before API routes
 app.use(async (req, res, next) => {
   try {
     await initializeBackend();
@@ -98,7 +107,6 @@ app.use("/booths", boothRouter);
 app.use("/exhibitor-files", exhibitorFileRouter);
 app.use("/messages", messageRouter);
 
-// Error handler
 app.use((error, req, res, next) => {
   if (res.headersSent) {
     return next(error);
