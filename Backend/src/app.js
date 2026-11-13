@@ -1,6 +1,15 @@
+
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+
+import database from "./configs/dbconfig.js";
+
+import Booth from "./models/boothmodel.js";
+import Notification from "./models/notificationmodel.js";
+import ExhibitorFile from "./models/exhibitorfilemodel.js";
+import Message from "./models/messagemodel.js";
+
 import authRouter from "./routes/authrouter.js";
 import forgetRouter from "./routes/forgetrouter.js";
 import eventRouter from "./routes/eventrouter.js";
@@ -13,40 +22,65 @@ import feedbackRouter from "./routes/feedbackrouter.js";
 import boothRouter from "./routes/boothrouter.js";
 import exhibitorFileRouter from "./routes/exhibitorfilerouter.js";
 import messageRouter from "./routes/messagerouter.js";
-import database from "./configs/dbconfig.js";
+
 import { announceChanges, streamUpdates } from "./services/liveupdates.js";
+
 const app = express();
-app.disable('x-powered-by');
+
+app.disable("x-powered-by");
+
 app.use(cors());
-// app.use((req, res, next) => {
-//   res.set('X-Content-Type-Options', 'nosniff');
-//   res.set('Referrer-Policy', 'no-referrer');
-//   const started = performance.now();
-//   res.once('finish', () => {
-//     if (process.env.NODE_ENV !== 'test') console.info(JSON.stringify({
-//       method: req.method,
-//       route: req.route?.path || 'unmatched',
-//       status: res.statusCode,
-//       durationMs: Math.round(performance.now() - started)
-//     }));
-//   });
-//   next();
-// });
-app.use(async (req, res, next) => {
-  try {
-    await database();
-    next();
-  } catch (error) {
-    console.error("Database connection failed:", error.name, error.code ?? error.cause?.code ?? (process.env.MONGODB_URL?.trim() ? "connection-error" : "missing-MONGODB_URL"));
-    res.status(503).json({ status: "database-unavailable" });
-  }
-});
-app.get('/health', (req, res) => res.json({ status: 'ready' }));
-app.get('/updates', streamUpdates);
-app.use(announceChanges);
+
 app.use(express.json({
   limit: "100kb"
 }));
+
+// Initialize MongoDB and required models
+let initializationPromise;
+
+async function initializeBackend() {
+  if (!initializationPromise) {
+    initializationPromise = (async () => {
+      await database();
+
+      await Promise.all([
+        Booth.init(),
+        Notification.init(),
+        ExhibitorFile.init(),
+        Message.init()
+      ]);
+    })().catch((error) => {
+      initializationPromise = null;
+      throw error;
+    });
+  }
+
+  return initializationPromise;
+}
+
+// Ensure backend is initialized before API requests
+app.use(async (req, res, next) => {
+  try {
+    await initializeBackend();
+    next();
+  } catch (error) {
+    console.error("Backend initialization failed:", error.message);
+
+    res.status(503).json({
+      success: false,
+      message: "Database connection unavailable"
+    });
+  }
+});
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ready" });
+});
+
+app.get("/updates", streamUpdates);
+
+app.use(announceChanges);
+
 app.use("/auth", authRouter);
 app.use("/forget", forgetRouter);
 app.use("/events", eventRouter);
@@ -59,23 +93,30 @@ app.use("/feedback", feedbackRouter);
 app.use("/booths", boothRouter);
 app.use("/exhibitor-files", exhibitorFileRouter);
 app.use("/messages", messageRouter);
+
+// Error handler
 app.use((error, req, res, next) => {
   if (res.headersSent) {
     return next(error);
   }
+
   if (error.type === "entity.parse.failed") {
     return res.status(400).json({
       msg: "Invalid JSON request"
     });
   }
+
   if (error.type === "entity.too.large") {
     return res.status(413).json({
       msg: "Request is too large"
     });
   }
-  console.error("Request failed:", error.name);
+
+  console.error("Request failed:", error.message);
+
   return res.status(500).json({
     msg: "Something went wrong. Please try again"
   });
 });
+
 export default app;
